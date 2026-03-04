@@ -2,15 +2,19 @@ use super::traits::{Tool, ToolArgument, ToolDefinition, ToolResult};
 use async_trait::async_trait;
 use std::path::Path;
 
+const DEFAULT_MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
+
 #[derive(Debug)]
 pub struct FileTool {
     allowed_directory: Option<String>,
+    max_file_size: u64,
 }
 
 impl FileTool {
     pub fn new() -> Self {
         Self {
             allowed_directory: None,
+            max_file_size: DEFAULT_MAX_FILE_SIZE,
         }
     }
 
@@ -18,6 +22,15 @@ impl FileTool {
     pub fn with_directory(dir: String) -> Self {
         Self {
             allowed_directory: Some(dir),
+            max_file_size: DEFAULT_MAX_FILE_SIZE,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn with_max_size(dir: String, max_size: u64) -> Self {
+        Self {
+            allowed_directory: Some(dir),
+            max_file_size: max_size,
         }
     }
 
@@ -95,6 +108,21 @@ impl Tool for FileTool {
 
         match operation {
             "read" => {
+                let metadata = tokio::fs::metadata(path).await
+                    .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+                
+                if metadata.len() > self.max_file_size {
+                    return Ok(ToolResult {
+                        success: false,
+                        output: String::new(),
+                        error: Some(format!(
+                            "File too large: {} bytes (max: {} bytes)",
+                            metadata.len(),
+                            self.max_file_size
+                        )),
+                    });
+                }
+
                 match tokio::fs::read_to_string(path).await {
                     Ok(content) => Ok(ToolResult {
                         success: true,
@@ -112,6 +140,18 @@ impl Tool for FileTool {
                 let content = args["content"]
                     .as_str()
                     .ok_or("Missing 'content' parameter for write operation")?;
+                
+                if content.len() as u64 > self.max_file_size {
+                    return Ok(ToolResult {
+                        success: false,
+                        output: String::new(),
+                        error: Some(format!(
+                            "Content too large: {} bytes (max: {} bytes)",
+                            content.len(),
+                            self.max_file_size
+                        )),
+                    });
+                }
                 
                 match tokio::fs::write(path, content).await {
                     Ok(_) => Ok(ToolResult {

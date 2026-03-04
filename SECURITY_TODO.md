@@ -32,7 +32,7 @@
 
 **修復方向**:
 - [ ] 預設設定工作目錄限制
-- [ ] 添加檔案大小上限 (建議 10MB)
+- [x] 添加檔案大小上限 (建議 10MB)
 - [ ] 整合 Config 中的 `security.workspace_only` 和 `security.allowed_roots`
 - [ ] 實作目錄越界檢查 (檢查 `..` 和 symlink)
 
